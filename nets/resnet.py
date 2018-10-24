@@ -26,25 +26,35 @@ class Block(torch.nn.Module):
             torch.nn.init.xavier_uniform_(self.s_conv.weight.data, 1.)
         self.activate = torch.nn.ReLU()
 
-    def forward(self, input):
-        x_r = input
+    def residual(self, input):
         x = self.conv1(input)
         x = self.activate(x)
         x = self.conv2(x)
         if self.optimized:
             x = torch.nn.functional.avg_pool2d(x, 2)
-            x_r = torch.nn.functional.avg_pool2d(x_r, 2)
-        if self.s_conv:
-            x_r = self.s_conv(x_r)
-        return x + x_r
+        return x
 
+    def shortcut(self, input):
+        x = input
+        if self.optimized:
+            x = torch.nn.functional.avg_pool2d(x, 2)
+        if self.s_conv:
+            x = self.s_conv(x)
+        return x
+
+
+    def forward(self, input):
+        x = self.residual(input)
+        x_r = self.shortcut(input)
+        return x + x_r
 
 
 class Gblock(Block):
 
     def __init__(self, in_channels, out_channels, hidden_channels=None, num_categories=None,
                  kernel_size=3, stride=1, padding=1, upsample=True):
-        super(Gblock, self).__init__(in_channels, out_channels, hidden_channels, kernel_size, stride, padding)
+        super(Gblock, self).__init__(in_channels, out_channels, hidden_channels, kernel_size, stride, padding,
+                                     upsample)
         self.upsample = upsample
         self.num_categories = num_categories
 
@@ -56,44 +66,63 @@ class Gblock(Block):
         return torch.nn.BatchNorm2d(num_features) if not self.num_categories \
             else CategoricalBatchNorm(num_features, self.num_categories)
 
-    def forward(self, input, y=None):
+    def residual(self, input, y=None):
         x = input
-        x_r = input
         x = self.bn1(x, y) if self.num_categories else self.bn1(x)
         x = self.activate(x)
         if self.upsample:
             x = self.up(x)
-            x_r = self.up(x_r)
         x = self.conv1(x)
         x = self.bn2(x, y) if self.num_categories else self.bn2(x)
         x = self.activate(x)
-        x = self.conv2(x)
+        return x
+
+    def shortcut(self, input):
+        x = input
+        if self.upsample:
+            x = self.up(x)
         if self.s_conv:
-            x_r = self.s_conv(x_r)
+            x = self.s_conv(x)
+        return x
+
+    def forward(self, input, y=None):
+        x = self.residual(input, y)
+        x_r = self.shortcut(input)
         return x + x_r
+
 
 class Dblock(Block):
 
     def __init__(self, in_channels, out_channels, hidden_channels=None, kernel_size=3, stride=1, padding=1,
                  downsample=False):
-        super(Dblock, self).__init__(in_channels, out_channels, hidden_channels, kernel_size, stride, padding)
+        super(Dblock, self).__init__(in_channels, out_channels, hidden_channels, kernel_size, stride, padding,
+                                     downsample)
         self.downsample = downsample
         self.conv1 = SpectralNorm(self.conv1)
         self.conv2 = SpectralNorm(self.conv2)
         if self.s_conv:
             self.s_conv = SpectralNorm(self.s_conv)
 
-    def forward(self, input):
-        x_r = input
-        if self.s_conv:
-            x_r = self.s_conv(x_r)
+    def residual(self, input):
         x = self.activate(input)
         x = self.conv1(x)
         x = self.activate(x)
         x = self.conv2(x)
         if self.downsample:
             x = torch.nn.functional.avg_pool2d(x, 2)
-            x_r = torch.nn.functional.avg_pool2d(x_r, 2)
+        return x
+
+    def shortcut(self, input):
+        x = input
+        if self.s_conv:
+            x = self.s_conv(x)
+        if self.downsample:
+            x = torch.nn.functional.avg_pool2d(x, 2)
+        return x
+
+    def forward(self, input):
+        x = self.residual(input)
+        x_r = self.shortcut(input)
         return x + x_r
 
 
@@ -105,8 +134,7 @@ class ResnetGenerator(torch.nn.Module):
         self.ch = ch
         self.n_categories = n_categories
         self.bottom_width = bottom_width
-        self.blocks = []
-        self.block_op = torch.nn.ModuleList()
+        self.blocks = torch.nn.ModuleList()
         self.final = self.final_block()
 
     def final_block(self):
@@ -124,7 +152,7 @@ class ResnetGenerator(torch.nn.Module):
     def forward(self, input, y=None):
         x = self.dense(input)
         x = x.view(x.shape[0], -1, self.bottom_width, self.bottom_width)
-        for block in self.block_op:
+        for block in self.blocks:
             x = block(x, y)
         x = self.final(x)
         return x
@@ -141,8 +169,6 @@ class ResnetGenerator128(ResnetGenerator):
         self.blocks.append(Gblock(self.ch * 8, self.ch * 4, upsample=True, num_categories=self.n_categories))
         self.blocks.append(Gblock(self.ch * 4, self.ch * 2, upsample=True, num_categories=self.n_categories))
         self.blocks.append(Gblock(self.ch * 2, self.ch, upsample=True, num_categories=self.n_categories))
-        self.block_op = torch.nn.Sequential(*self.blocks)
-        self.final = self.final_block()
 
 
 class ResnetGenerator32(ResnetGenerator):
@@ -154,8 +180,6 @@ class ResnetGenerator32(ResnetGenerator):
         self.blocks.append(Gblock(self.ch, self.ch, upsample=True, num_categories=self.n_categories))
         self.blocks.append(Gblock(self.ch, self.ch, upsample=True, num_categories=self.n_categories))
         self.blocks.append(Gblock(self.ch, self.ch, upsample=True, num_categories=self.n_categories))
-        self.block_op = torch.nn.Sequential(*self.blocks)
-
 
 
 class ResnetDiscriminator(torch.nn.Module):
@@ -165,11 +189,12 @@ class ResnetDiscriminator(torch.nn.Module):
         self.activate = torch.nn.ReLU()
         self.ch = ch
         self.n_categories = n_categories
-        self.blocks = [Block(3, self.ch, optimized=True)]
-        self.block_op = torch.nn.Sequential()
+        self.blocks = torch.nn.ModuleList([Block(3, self.ch, optimized=True)])
 
     def forward(self, input, y=None):
-        x = self.block_op(input)
+        x = input
+        for block in self.blocks:
+            x = block(x)
         x = self.activate(x)
         x = torch.sum(x, (2, 3))
         output = self.l(x)
@@ -183,13 +208,11 @@ class ResnetDiscriminator128(ResnetDiscriminator):
 
     def __init__(self, ch=64, n_categories=0):
         super(ResnetDiscriminator128, self).__init__(ch, n_categories)
-
         self.blocks.append(Dblock(self.ch, self.ch*2, downsample=True))
         self.blocks.append(Dblock(self.ch*2, self.ch*4, downsample=True))
         self.blocks.append(Dblock(self.ch*4, self.ch*8, downsample=True))
         self.blocks.append(Dblock(self.ch*8, self.ch*16, downsample=True))
         self.blocks.append(Dblock(self.ch*16, self.ch*16, downsample=True))
-        self.block_op = torch.nn.Sequential(*self.blocks)
         self.l = SpectralNorm(torch.nn.Linear(self.ch*16, 1))
         torch.nn.init.xavier_uniform_(self.l.module.weight.data, 1.)
         if n_categories > 0:
@@ -201,14 +224,12 @@ class ResnetDiscriminator32(ResnetDiscriminator):
 
     def __init__(self, ch=128, n_categories=0):
         super(ResnetDiscriminator32, self).__init__(ch, n_categories)
-        self.blocks += [
-            Dblock(self.ch, self.ch, downsample=True),
-            Dblock(self.ch, self.ch, downsample=True),
-            Dblock(self.ch, self.ch, downsample=True)
-            ]
-        self.block_op = torch.nn.Sequential(*self.blocks)
+        self.blocks.append(Dblock(self.ch, self.ch, downsample=True))
+        self.blocks.append(Dblock(self.ch, self.ch, downsample=False))
+        self.blocks.append(Dblock(self.ch, self.ch, downsample=False))
 
-        self.l = SpectralNorm(torch.nn.Linear(self.ch, 1, bias=True))
+        self.l = SpectralNorm(torch.nn.Linear(self.ch, 1, bias=False))
         if n_categories > 0:
             self.l_y = SpectralNorm(torch.nn.Embedding(n_categories, self.ch))
+            torch.nn.init.xavier_uniform_(self.l_y.module.weight.data, 1.)
 
