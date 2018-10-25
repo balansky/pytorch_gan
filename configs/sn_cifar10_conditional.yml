@@ -1,0 +1,51 @@
+# conditional CIFAR10 generation with SN and projection discriminator
+iteration: 50000
+iteration_decay_start: 0
+seed: 0
+display_interval: 100
+progressbar_interval: 100
+snapshot_interval: 1000
+evaluation_interval: 10000
+
+models:
+  generator:
+    fn: nets/resnet.py
+    name: ResnetGenerator32
+    args:
+      z_dim: 128
+      bottom_width: 4
+      ch: 256
+      n_categories: 10
+
+
+  discriminator:
+      fn: nets/resnet.py
+      name: ResnetDiscriminator32
+      args:
+        ch: 128
+        n_categories: 10
+        spectral_norm: True
+
+dataset:
+  dataset_fn: datasets/cifar10.py
+  dataset_name: Cifar10
+  args:
+    train: True
+    shuffle: True
+    pin_memory: True
+    drop_last: True
+
+optimizer:
+  name: adam
+  alpha: 0.0002
+  beta1: 0.0
+  beta2: 0.9
+
+updater:
+  fn: training/updater.py
+  name: GanUpdater
+  args:
+    n_dis: 5
+    n_gen_samples: 128
+    loss_type: hinge
+    decay_gamma: 0.99

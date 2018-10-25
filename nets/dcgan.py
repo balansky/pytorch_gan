@@ -2,10 +2,10 @@ import torch.nn as nn
 from nets.layers.spectral_norm import SpectralNorm
 
 
-class ToyGenerator(nn.Module):
+class Generator(nn.Module):
 
     def __init__(self, nz):
-        super(ToyGenerator, self).__init__()
+        super(Generator, self).__init__()
         self.fc = nn.Linear(nz, 7*7*64, bias=False)
         self.fc_bn = nn.BatchNorm1d(7*7*64)
         self.fc_relu = nn.ReLU()
@@ -32,10 +32,10 @@ class ToyGenerator(nn.Module):
         return x
 
 
-class ToyDescriminator(nn.Module):
+class Descriminator(nn.Module):
 
     def __init__(self, nc):
-        super(ToyDescriminator, self).__init__()
+        super(Descriminator, self).__init__()
         self.main = nn.Sequential(
             SpectralNorm(nn.Conv2d(nc, 64, 5, 2, 16, bias=False)),
             # nn.Conv2d(nc, 64, 5, 2, 16, bias=False),
