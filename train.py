@@ -26,9 +26,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', type=str, default='configs/base.yml', help='path to config file')
     parser.add_argument('--data_dir', type=str, default='./data/imagenet')
-    parser.add_argument('--results_dir', type=str, default='./results/gans',
+    parser.add_argument('--result_dir', type=str, default='./results/gans',
                         help='directory to save the results to')
-    parser.add_argument('--batch_size', type=int, default=64, help="mini batch size")
+    parser.add_argument('--batch_size', type=int, default=32, help="mini batch size")
     parser.add_argument('--loaderjob', type=int, default=4,
                         help='number of parallel data loading processes')
     args = parser.parse_args()
