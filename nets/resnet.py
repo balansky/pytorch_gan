@@ -192,10 +192,12 @@ class BaseDiscriminator(torch.nn.Module):
         self.out_ch = out_ch if out_ch else in_ch
         self.n_categories = n_categories
         self.blocks = torch.nn.ModuleList([Block(3, self.ch, optimized=True, spectral_norm=spectral_norm)])
-        self.l = SpectralNorm(torch.nn.Linear(self.out_ch, 1, l_bias))
+        self.l = SpectralNorm(torch.nn.Linear(self.out_ch, 1, l_bias)) if spectral_norm else \
+            torch.nn.Linear(self.out_ch, 1, l_bias)
         torch.nn.init.xavier_uniform_(self.l.module.weight.data, 1.)
         if n_categories > 0:
-            self.l_y = SpectralNorm(torch.nn.Embedding(n_categories, self.out_ch))
+            self.l_y = SpectralNorm(torch.nn.Embedding(n_categories, self.out_ch)) if spectral_norm else \
+                torch.nn.Embedding(n_categories, self.out_ch)
             torch.nn.init.xavier_uniform_(self.l_y.module.weight.data, 1.)
 
     def forward(self, input, y=None):
