@@ -129,12 +129,15 @@ class Dblock(Block):
 
 class BaseGenerator(torch.nn.Module):
 
-    def __init__(self, ch, z_dim, n_categories=None, bottom_width=4):
+    def __init__(self, z_dim, ch, d_ch=None, n_categories=None, bottom_width=4):
         super(BaseGenerator, self).__init__()
         self.z_dim = z_dim
         self.ch = ch
+        self.d_ch = d_ch if d_ch else ch
         self.n_categories = n_categories
         self.bottom_width = bottom_width
+        self.dense = torch.nn.Linear(self.z_dim, self.bottom_width * self.bottom_width * self.d_ch)
+        torch.nn.init.xavier_uniform_(self.dense.weight.data, 1.)
         self.blocks = torch.nn.ModuleList()
         self.final = self.final_block()
 
@@ -162,10 +165,8 @@ class BaseGenerator(torch.nn.Module):
 class ResnetGenerator(BaseGenerator):
 
     def __init__(self, ch=64, z_dim=128, n_categories=None, bottom_width=4):
-        super(ResnetGenerator, self).__init__(ch, z_dim, n_categories, bottom_width)
-        self.dense = torch.nn.Linear(self.z_dim, self.bottom_width * self.bottom_width * self.ch * 16)
-        torch.nn.init.xavier_uniform_(self.dense.weight.data, 1.)
-        self.blocks.append(Gblock(self.ch*16, self.ch*16, upsample=True, num_categories=self.n_categories))
+        super(ResnetGenerator, self).__init__(z_dim, ch, ch*16, n_categories, bottom_width)
+        self.blocks.append(Gblock(self.ch * 16, self.ch * 16, upsample=True, num_categories=self.n_categories))
         self.blocks.append(Gblock(self.ch * 16, self.ch * 8, upsample=True, num_categories=self.n_categories))
         self.blocks.append(Gblock(self.ch * 8, self.ch * 4, upsample=True, num_categories=self.n_categories))
         self.blocks.append(Gblock(self.ch * 4, self.ch * 2, upsample=True, num_categories=self.n_categories))
@@ -175,12 +176,20 @@ class ResnetGenerator(BaseGenerator):
 class ResnetGenerator32(BaseGenerator):
 
     def __init__(self, ch=256, z_dim=128, n_categories=None, bottom_width=4):
-        super(ResnetGenerator32, self).__init__(ch, z_dim, n_categories, bottom_width)
-        self.dense = torch.nn.Linear(self.z_dim, self.bottom_width * self.bottom_width * self.ch)
-        torch.nn.init.xavier_uniform_(self.dense.weight.data, 1.)
+        super(ResnetGenerator32, self).__init__(z_dim, ch, ch, n_categories, bottom_width)
         self.blocks.append(Gblock(self.ch, self.ch, upsample=True, num_categories=self.n_categories))
         self.blocks.append(Gblock(self.ch, self.ch, upsample=True, num_categories=self.n_categories))
         self.blocks.append(Gblock(self.ch, self.ch, upsample=True, num_categories=self.n_categories))
+
+
+class ResnetGenerator64(BaseGenerator):
+
+    def __init__(self, ch=64, z_dim=128, n_categories=None, bottom_width=4):
+        super(ResnetGenerator64, self).__init__(z_dim, ch, ch*16, n_categories, bottom_width)
+        self.blocks.append(Gblock(self.ch*16, self.ch*8, upsample=True, num_categories=self.n_categories))
+        self.blocks.append(Gblock(self.ch*8, self.ch*4, upsample=True, num_categories=self.n_categories))
+        self.blocks.append(Gblock(self.ch*4, self.ch*2, upsample=True, num_categories=self.n_categories))
+        self.blocks.append(Gblock(self.ch*2, self.ch, upsample=True, num_categories=self.n_categories))
 
 
 class BaseDiscriminator(torch.nn.Module):
@@ -232,3 +241,12 @@ class ResnetDiscriminator32(BaseDiscriminator):
         self.blocks.append(Dblock(self.ch, self.ch, downsample=False, spectral_norm=spectral_norm))
         self.blocks.append(Dblock(self.ch, self.ch, downsample=False, spectral_norm=spectral_norm))
 
+
+class ResnetDiscriminator64(BaseDiscriminator):
+
+    def __init__(self, ch=64, n_categories=0, spectral_norm=True):
+        super(ResnetDiscriminator64, self).__init__(ch, ch*16, n_categories, spectral_norm=spectral_norm)
+        self.blocks.append(Dblock(self.ch, self.ch*2, downsample=True, spectral_norm=spectral_norm))
+        self.blocks.append(Dblock(self.ch*2, self.ch*4, downsample=True, spectral_norm=spectral_norm))
+        self.blocks.append(Dblock(self.ch*4, self.ch*8, downsample=True, spectral_norm=spectral_norm))
+        self.blocks.append(Dblock(self.ch*8, self.ch*16, downsample=True, spectral_norm=spectral_norm))

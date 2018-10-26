@@ -28,7 +28,7 @@ class GanTrainer(object):
     def run(self):
         self.create_snapshot_dir()
         for i in range(1, self.iteration + 1):
-            disc_loss, gen_loss = self.updater.update(i)
+            disc_loss, gen_loss = self.updater.update()
             if i % self.display_interval == 0 or i == self.iteration:
                 print('[%d]\tLoss_D: %.4f\tLoss_G: %.4f'
                       % (i, disc_loss.item(), gen_loss.item()))

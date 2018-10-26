@@ -13,16 +13,17 @@ def loss_hinge_gen(dis_fake):
 
 class GanUpdater(object):
 
-    def __init__(self, genenerator, discriminator, gen_optimizer, dis_optimizer, dataset, n_gen_samples,
-                 n_dis, loss_type, decay_gamma, device):
+    def __init__(self, dataset, genenerator, discriminator, gen_optimizer, dis_optimizer,
+                 scheduler_g=None, scheduler_d=None, n_gen_samples=64,
+                 n_dis=5, loss_type='hinge', device=torch.device("cpu")):
         self.gen = genenerator.to(device)
         self.dis = discriminator.to(device)
         self.mirror_gen = copy.deepcopy(genenerator).to(device)
         self.mirror_gen.eval()
         self.gen_optimizer = gen_optimizer
         self.dis_optimizer = dis_optimizer
-        self.scheduler_g = torch.optim.lr_scheduler.ExponentialLR(gen_optimizer, gamma=decay_gamma)
-        self.scheduler_d = torch.optim.lr_scheduler.ExponentialLR(dis_optimizer, gamma=decay_gamma)
+        self.scheduler_g = scheduler_g
+        self.scheduler_d = scheduler_d
         self.num_categories = genenerator.n_categories
         self.dataset = dataset
         self.batch_size = dataset.batch_size
@@ -60,7 +61,7 @@ class GanUpdater(object):
         self.gen.load_state_dict(torch.load(gen_path))
         self.dis.load_state_dict(torch.load(dis_path))
 
-    def update(self, iter):
+    def update(self):
 
         for _ in range(self.n_dis):
             x_real, y_real = self.dataset.get_next()
@@ -86,7 +87,7 @@ class GanUpdater(object):
 
         self.gen_optimizer.step()
 
-        if iter % len(self.dataset) == 0:
+        if self.scheduler_d and self.scheduler_g:
             self.scheduler_g.step()
             self.scheduler_d.step()
 

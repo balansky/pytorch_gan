@@ -28,9 +28,18 @@ def load_optimizer(config, params):
                      betas=(optimizer_config['beta1'], optimizer_config['beta2']))
 
 
+def load_scheduler(config, optimizer):
+    if not hasattr(config, 'scheduler'):
+        return None
+    scheduler_config = config.scheduler
+    scheduler = load_module(scheduler_config['fn'],
+                            scheduler_config['name'])
+    return scheduler(optimizer, **scheduler_config['args'])
+
+
 def load_dataset(batch_size, root_dir, num_workers, config):
-    dataset = load_module(config.dataset['dataset_fn'],
-                          config.dataset['dataset_name'])
+    dataset = load_module(config.dataset['fn'],
+                          config.dataset['name'])
     return dataset(root=root_dir, batch_size=batch_size, num_workers=num_workers, **config.dataset['args'])
 
 

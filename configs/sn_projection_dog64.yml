@@ -8,7 +8,7 @@ evaluation_interval: 5000
 models:
   generator:
     fn: nets/resnet.py
-    name: ResnetGenerator64
+    name: ResnetGenerator
     args:
       z_dim: 128
       bottom_width: 4
@@ -18,7 +18,7 @@ models:
 
   discriminator:
       fn: nets/resnet.py
-      name: ResnetDiscriminator64
+      name: ResnetDiscriminator
       args:
         ch: 64
         n_categories: 120
@@ -28,10 +28,10 @@ dataset:
   fn: datasets/imagenet_dog.py
   name: ImageNetDogDataset
   args:
-    size: 64
+    size: 128
     augmentation: True
     shuffle: True
-    pin_memory: False
+    pin_memory: True
     drop_last: True
 
 optimizer:
@@ -44,13 +44,13 @@ scheduler:
   fn: training/scheduler.py
   name: LinearDecayLR
   args:
-    decay_start: 200000
-    max_iterations: 250000
+    decay_start: 250000
+    max_iterations: 200000
 
 updater:
   fn: training/updater.py
   name: GanUpdater
   args:
     n_dis: 5
-    n_gen_samples: 64
+    n_gen_samples: 32
     loss_type: hinge

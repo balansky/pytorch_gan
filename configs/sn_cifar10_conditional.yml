@@ -1,6 +1,5 @@
 # conditional CIFAR10 generation with SN and projection discriminator
 iteration: 50000
-iteration_decay_start: 0
 seed: 0
 display_interval: 100
 progressbar_interval: 100
@@ -27,8 +26,8 @@ models:
         spectral_norm: True
 
 dataset:
-  dataset_fn: datasets/cifar10.py
-  dataset_name: Cifar10
+  fn: datasets/cifar10.py
+  name: Cifar10
   args:
     train: True
     shuffle: True
@@ -48,4 +47,3 @@ updater:
     n_dis: 5
     n_gen_samples: 128
     loss_type: hinge
-    decay_gamma: 0.99

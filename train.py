@@ -12,10 +12,14 @@ def main(args):
     gen_optimizer = load_optimizer(config, gen.parameters())
     dis_optimizer = load_optimizer(config, filter(lambda p: p.requires_grad, dis.parameters()))
 
+    scheduler_g = load_scheduler(config, gen_optimizer)
+    scheduler_d = load_scheduler(config, dis_optimizer)
+
     dataset = load_dataset(args.batch_size, args.data_dir, args.loaderjob, config)
 
-    updater = load_updater_class(config)(gen, dis, gen_optimizer, dis_optimizer, dataset, device=device,
-                                         **config.updater['args'])
+    updater = load_updater_class(config)(dataset, gen, dis, gen_optimizer, dis_optimizer, scheduler_g, scheduler_d,
+                                         device=device, **config.updater['args'])
+
     trainer = GanTrainer(updater, args.result_dir, config.iteration, config.display_interval, config.snapshot_interval,
                          config.evaluation_interval)
 
@@ -28,7 +32,7 @@ if __name__ == "__main__":
     parser.add_argument('--data_dir', type=str, default='./data/imagenet')
     parser.add_argument('--result_dir', type=str, default='./results/gans',
                         help='directory to save the results to')
-    parser.add_argument('--batch_size', type=int, default=32, help="mini batch size")
+    parser.add_argument('--batch_size', type=int, default=64, help="mini batch size")
     parser.add_argument('--loaderjob', type=int, default=4,
                         help='number of parallel data loading processes')
     args = parser.parse_args()
