@@ -22,7 +22,7 @@ models:
       args:
         ch: 64
         n_categories: 120
-        spectral_norm: True
+        spectral_norm: 1
 
 dataset:
   fn: datasets/imagenet_dog.py

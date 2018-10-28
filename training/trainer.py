@@ -15,7 +15,7 @@ class GanTrainer(object):
         self.output_dir = output_dir
         self.snapshot_dir = os.path.join(output_dir, 'snapshots')
         self.sample_dir = os.path.join(output_dir, 'samples')
-        self.n_row = int(math.sqrt(updater.n_gen_samples)) + 1
+        self.n_row = max(int(math.sqrt(updater.n_gen_samples)), 1)
 
     def create_snapshot_dir(self):
         if not os.path.exists(self.output_dir):

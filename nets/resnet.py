@@ -1,34 +1,30 @@
-import torch
 import math
 from nets.layers.categorical_batch_norm import CategoricalBatchNorm
-from nets.layers.spectral_norm import SpectralNorm
+from nets.layers.spectral_norm import *
 
 
 class Block(torch.nn.Module):
 
     def __init__(self, in_channels, out_channels, hidden_channels=None,
-                 kernel_size=3, stride=1, padding=1, optimized=False, spectral_norm=True):
+                 kernel_size=3, stride=1, padding=1, optimized=False, spectral_norm=1):
         super(Block, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.optimized = optimized
         self.hidden_channels = out_channels if not hidden_channels else hidden_channels
 
-        self.conv1 = torch.nn.Conv2d(self.in_channels, self.hidden_channels,
-                                     kernel_size=kernel_size, stride=stride, padding=padding)
-        self.conv2 = torch.nn.Conv2d(self.hidden_channels, self.out_channels,
-                                     kernel_size=kernel_size, stride=stride, padding=padding)
+        self.conv1 = Conv2d(self.in_channels, self.hidden_channels,
+                            kernel_size=kernel_size, stride=stride, padding=padding, spectral_norm_pi=spectral_norm)
+        self.conv2 = Conv2d(self.hidden_channels, self.out_channels,
+                            kernel_size=kernel_size, stride=stride, padding=padding, spectral_norm_pi=spectral_norm)
         self.s_conv = None
         torch.nn.init.xavier_uniform_(self.conv1.weight.data, math.sqrt(2))
         torch.nn.init.xavier_uniform_(self.conv2.weight.data, math.sqrt(2))
         if self.in_channels != self.out_channels or optimized:
-            self.s_conv = torch.nn.Conv2d(self.in_channels, self.out_channels, kernel_size=1, padding=0)
+            self.s_conv = Conv2d(self.in_channels, self.out_channels, kernel_size=1, padding=0,
+                                 spectral_norm_pi=spectral_norm)
             torch.nn.init.xavier_uniform_(self.s_conv.weight.data, 1.)
-        if spectral_norm:
-            self.conv1 = SpectralNorm(self.conv1)
-            self.conv2 = SpectralNorm(self.conv2)
-            if self.s_conv:
-                self.s_conv = SpectralNorm(self.s_conv)
+
         self.activate = torch.nn.ReLU()
 
     def residual(self, input):
@@ -59,7 +55,7 @@ class Gblock(Block):
     def __init__(self, in_channels, out_channels, hidden_channels=None, num_categories=None,
                  kernel_size=3, stride=1, padding=1, upsample=True):
         super(Gblock, self).__init__(in_channels, out_channels, hidden_channels, kernel_size, stride, padding,
-                                     upsample)
+                                     upsample, spectral_norm=0)
         self.upsample = upsample
         self.num_categories = num_categories
 
@@ -99,7 +95,7 @@ class Gblock(Block):
 class Dblock(Block):
 
     def __init__(self, in_channels, out_channels, hidden_channels=None, kernel_size=3, stride=1, padding=1,
-                 downsample=False, spectral_norm=True):
+                 downsample=False, spectral_norm=1):
         super(Dblock, self).__init__(in_channels, out_channels, hidden_channels, kernel_size, stride, padding,
                                      downsample, spectral_norm)
         self.downsample = downsample
@@ -194,20 +190,18 @@ class ResnetGenerator64(BaseGenerator):
 
 class BaseDiscriminator(torch.nn.Module):
 
-    def __init__(self, in_ch, out_ch=None, n_categories=0, l_bias=True, spectral_norm=True):
+    def __init__(self, in_ch, out_ch=None, n_categories=0, l_bias=True, spectral_norm=1):
         super(BaseDiscriminator, self).__init__()
         self.activate = torch.nn.ReLU()
         self.ch = in_ch
         self.out_ch = out_ch if out_ch else in_ch
         self.n_categories = n_categories
         self.blocks = torch.nn.ModuleList([Block(3, self.ch, optimized=True, spectral_norm=spectral_norm)])
-        self.l = SpectralNorm(torch.nn.Linear(self.out_ch, 1, l_bias)) if spectral_norm else \
-            torch.nn.Linear(self.out_ch, 1, l_bias)
-        torch.nn.init.xavier_uniform_(self.l.module.weight.data, 1.)
+        self.l = Linear(self.out_ch, 1, l_bias, spectral_norm_pi=spectral_norm)
+        torch.nn.init.xavier_uniform_(self.l.weight.data, 1.)
         if n_categories > 0:
-            self.l_y = SpectralNorm(torch.nn.Embedding(n_categories, self.out_ch)) if spectral_norm else \
-                torch.nn.Embedding(n_categories, self.out_ch)
-            torch.nn.init.xavier_uniform_(self.l_y.module.weight.data, 1.)
+            self.l_y = Embedding(n_categories, self.out_ch, spectral_norm_pi=spectral_norm)
+            torch.nn.init.xavier_uniform_(self.l_y.weight.data, 1.)
 
     def forward(self, input, y=None):
         x = input
@@ -224,7 +218,7 @@ class BaseDiscriminator(torch.nn.Module):
 
 class ResnetDiscriminator(BaseDiscriminator):
 
-    def __init__(self, ch=64, n_categories=0, spectral_norm=True):
+    def __init__(self, ch=64, n_categories=0, spectral_norm=1):
         super(ResnetDiscriminator, self).__init__(ch, ch*16, n_categories, spectral_norm=spectral_norm)
         self.blocks.append(Dblock(self.ch, self.ch*2, downsample=True, spectral_norm=spectral_norm))
         self.blocks.append(Dblock(self.ch*2, self.ch*4, downsample=True, spectral_norm=spectral_norm))
@@ -235,7 +229,7 @@ class ResnetDiscriminator(BaseDiscriminator):
 
 class ResnetDiscriminator32(BaseDiscriminator):
 
-    def __init__(self, ch=128, n_categories=0, spectral_norm=True):
+    def __init__(self, ch=128, n_categories=0, spectral_norm=1):
         super(ResnetDiscriminator32, self).__init__(ch, ch, n_categories, l_bias=False, spectral_norm=spectral_norm)
         self.blocks.append(Dblock(self.ch, self.ch, downsample=True, spectral_norm=spectral_norm))
         self.blocks.append(Dblock(self.ch, self.ch, downsample=False, spectral_norm=spectral_norm))
@@ -244,7 +238,7 @@ class ResnetDiscriminator32(BaseDiscriminator):
 
 class ResnetDiscriminator64(BaseDiscriminator):
 
-    def __init__(self, ch=64, n_categories=0, spectral_norm=True):
+    def __init__(self, ch=64, n_categories=0, spectral_norm=1):
         super(ResnetDiscriminator64, self).__init__(ch, ch*16, n_categories, spectral_norm=spectral_norm)
         self.blocks.append(Dblock(self.ch, self.ch*2, downsample=True, spectral_norm=spectral_norm))
         self.blocks.append(Dblock(self.ch*2, self.ch*4, downsample=True, spectral_norm=spectral_norm))

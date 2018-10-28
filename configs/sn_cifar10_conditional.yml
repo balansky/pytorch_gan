@@ -23,7 +23,7 @@ models:
       args:
         ch: 128
         n_categories: 10
-        spectral_norm: True
+        spectral_norm: 1
 
 dataset:
   fn: datasets/cifar10.py
