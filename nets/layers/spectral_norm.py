@@ -13,22 +13,27 @@ class SpectralNorm(nn.Module):
         self.module = module
         self.name = name
         self.power_iterations = power_iterations
-        self.w = getattr(module, name)
         self.sigma = None
-        self.output_dim = self.w.data.shape[0]
-        self.u = Parameter(self.w.data.new(self.output_dim).normal_(0, 1), requires_grad=False)
+        self.register_buffer("u", torch.randn(getattr(module, name).data.shape[0], requires_grad=False))
 
 
     def _update_u_v(self):
-        w_reshaped = self.w.data.view(self.output_dim, -1)
+
+        w = getattr(self.module, self.name)
+        # _, self.sigma, _ = torch.svd(w.data)
+        # self.sigma = self.sigma[0]
+        # w.data = w.data/self.sigma
+
+        w_mat = w.data.view(w.data.shape[0], -1)
 
         for _ in range(self.power_iterations):
-            v = l2normalize(torch.mv(torch.t(w_reshaped), self.u.data))
+            v = l2normalize(torch.mv(torch.t(w_mat), self.u))
 
-            self.u.data = l2normalize(torch.mv(w_reshaped, v))
+            self.u = l2normalize(torch.mv(w_mat, v))
 
-        self.sigma = torch.dot(torch.mv(torch.t(w_reshaped), self.u.data), v)
-        self.w.data = self.w.data/self.sigma.expand_as(self.w.data)
+        self.sigma = torch.dot(torch.mv(torch.t(w_mat), self.u), v)
+        w.data = w.data/self.sigma
+        # setattr(self.module, self.name, w)
 
 
     def forward(self, *args):
