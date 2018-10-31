@@ -1,5 +1,6 @@
 import torch
 import copy
+from utils.sample import sample_noises
 
 def loss_hinge_dis(dis_fake, dis_real):
     loss = torch.nn.functional.relu(1.0 - dis_real).mean() + \
@@ -31,21 +32,21 @@ class GanUpdater(object):
         self.device = device
         self.n_dis = n_dis
         self.n_gen_samples = n_gen_samples
-        self.fixed_noise, self.fixed_y = self.sample_fakes(n_gen_samples)
+        self.fixed_noise, self.fixed_y = sample_noises(self.n_gen_samples, self.z_dim, self.num_categories, device)
         if loss_type == "hinge":
             self.loss_gen = loss_hinge_gen
             self.loss_dis = loss_hinge_dis
         else:
             raise NotImplementedError
 
-    def sample_fakes(self, batch_size):
-        noise = torch.randn(batch_size, self.z_dim, device=self.device)
-        if self.num_categories:
-            y_fake = torch.randint(low=0, high=self.num_categories, size=(batch_size,), dtype=torch.long,
-                                   device=self.device)
-        else:
-            y_fake = None
-        return noise, y_fake
+    # def sample_fakes(self, batch_size):
+    #     noise = torch.randn(batch_size, self.z_dim, device=self.device)
+    #     if self.num_categories:
+    #         y_fake = torch.randint(low=0, high=self.num_categories, size=(batch_size,), dtype=torch.long,
+    #                                device=self.device)
+    #     else:
+    #         y_fake = None
+    #     return noise, y_fake
 
     def gen_samples(self):
         with torch.no_grad():
@@ -67,7 +68,7 @@ class GanUpdater(object):
             x_real, y_real = self.dataset.get_next()
             x_real = x_real.to(self.device)
             y_real = y_real.to(self.device)
-            noise, y_fake = self.sample_fakes(self.batch_size)
+            noise, y_fake = sample_noises(self.batch_size, self.z_dim, self.num_categories, self.device)
             self.dis_optimizer.zero_grad()
             self.gen_optimizer.zero_grad()
             dis_real = self.dis(x_real, y_real)
@@ -79,7 +80,7 @@ class GanUpdater(object):
         self.dis_optimizer.zero_grad()
         self.gen_optimizer.zero_grad()
 
-        noise, y_fake = self.sample_fakes(self.batch_size)
+        noise, y_fake = sample_noises(self.batch_size, self.z_dim, self.num_categories, self.device)
 
         x_fake = self.gen(noise, y_fake)
         gen_loss = -self.dis(x_fake, y_fake).mean()
