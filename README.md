@@ -11,7 +11,7 @@ python train.py --config_path configs/sn_cifar10_conditional.yml --batch_size 12
 to be implement (inception score, fid)
 
 ### 64X64 Imagenet Dog Samples
-![](img/250000_img.png)
+![](samples/250000_img.png)
 
 ### References
 - Takeru Miyato, Toshiki Kataoka, Masanori Koyama, Yuichi Yoshida. *Spectral Normalization for Generative Adversarial Networks*. ICLR2018. [OpenReview][sngans]
