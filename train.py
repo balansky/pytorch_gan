@@ -15,13 +15,13 @@ def main(args):
     scheduler_g = load_scheduler(config, gen_optimizer)
     scheduler_d = load_scheduler(config, dis_optimizer)
 
+
     dataset = load_dataset(args.batch_size, args.data_dir, args.loaderjob, config)
 
-    updater = load_updater_class(config)(dataset, gen, dis, gen_optimizer, dis_optimizer, scheduler_g, scheduler_d,
-                                         device=device, **config.updater['args'])
+    evaluator = load_evaluator(config, device)
 
-    trainer = GanTrainer(updater, args.result_dir, config.iteration, config.display_interval, config.snapshot_interval,
-                         config.evaluation_interval)
+    trainer = GanTrainer(args.iterations, dataset, gen, dis, gen_optimizer, dis_optimizer, args.result_dir,
+                         scheduler_g, scheduler_d, evaluator=evaluator, device=device, **config.trainer['args'])
 
     trainer.run()
 
@@ -30,6 +30,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--config_path', type=str, default='configs/base.yml', help='path to config file')
     parser.add_argument('--data_dir', type=str, default='./data/imagenet')
+    parser.add_argument('--iterations', type=int, default=250000)
     parser.add_argument('--result_dir', type=str, default='./results/gans',
                         help='directory to save the results to')
     parser.add_argument('--batch_size', type=int, default=64, help="mini batch size")

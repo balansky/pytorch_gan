@@ -37,6 +37,14 @@ def load_scheduler(config, optimizer):
     return scheduler(optimizer, **scheduler_config['args'])
 
 
+def load_evaluator(config, device):
+    if not hasattr(config, 'evaluator'):
+        return None
+    evaluator_config = config.evaluator
+    evaluator = load_module(evaluator_config['fn'], evaluator_config['name'])
+    return evaluator(device=device, **evaluator_config['args'])
+
+
 def load_dataset(batch_size, root_dir, num_workers, config):
     dataset = load_module(config.dataset['fn'],
                           config.dataset['name'])

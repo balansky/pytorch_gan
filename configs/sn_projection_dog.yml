@@ -1,9 +1,4 @@
 iteration: 250000
-seed: 0
-display_interval: 100
-progressbar_interval: 100
-snapshot_interval: 1000
-evaluation_interval: 5000
 
 models:
   generator:
@@ -47,10 +42,21 @@ scheduler:
     decay_start: 200000
     max_iterations: 250000
 
-updater:
-  fn: training/updater.py
-  name: GanUpdater
+trainer:
+  fn: training/trainer.py
+  name: GanTrainer
   args:
     n_dis: 5
     n_gen_samples: 64
     loss_type: hinge
+    display_interval: 100
+    snapshot_interval: 1000
+    evaluation_interval: 5000
+
+evaluator:
+  fn: training/evaluator.py
+  name: Inception
+  args:
+    n_images: 50000
+    batch_size: 100
+    split: 10
