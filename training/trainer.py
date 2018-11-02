@@ -113,7 +113,10 @@ class GanTrainer(object):
                 self.save(os.path.join(self.snapshot_dir, "gen_%d.pt" % i),
                           os.path.join(self.snapshot_dir, "dis_%d.pt" % i))
             if self.evaluator and (i % self.evaluation_interval == 0 or i == self.iteration):
-                self.evaluator.eval()
+                print("evaluating inception score....")
+                self.mirror_gen.load_state_dict(self.gen.state_dict())
+                score, _ = self.evaluator.eval_gen(self.mirror_gen)
+                print("[%d] evaluated inception score: %.4f" % (i, score))
         print("Training Done !")
 
 

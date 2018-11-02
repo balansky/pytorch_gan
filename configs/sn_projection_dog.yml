@@ -59,4 +59,4 @@ evaluator:
   args:
     n_images: 50000
     batch_size: 100
-    split: 10
+    splits: 10

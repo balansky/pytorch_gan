@@ -41,7 +41,7 @@ class ImageNetDogDataset(Dataset):
             image_transform = transforms.Compose([
                 Crop(augmentation=augmentation),
                 transforms.RandomHorizontalFlip(),
-                transforms.Resize(size),
+                transforms.Resize((size, size)),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[.5, .5, .5], std=[.5, .5, .5]),
                 # transforms.Lambda(add_noise)

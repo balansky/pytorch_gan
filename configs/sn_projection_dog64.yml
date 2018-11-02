@@ -4,7 +4,7 @@ seed: 0
 models:
   generator:
     fn: nets/resnet.py
-    name: ResnetGenerator
+    name: ResnetGenerator64
     args:
       z_dim: 128
       bottom_width: 4
@@ -14,7 +14,7 @@ models:
 
   discriminator:
       fn: nets/resnet.py
-      name: ResnetDiscriminator
+      name: ResnetDiscriminator64
       args:
         ch: 64
         n_categories: 120
@@ -52,7 +52,7 @@ trainer:
     loss_type: hinge
     display_interval: 100
     snapshot_interval: 1000
-    evaluation_interval: 5000
+    evaluation_interval: 10000
 
 evaluator:
   fn: training/evaluator.py
@@ -60,4 +60,4 @@ evaluator:
   args:
     n_images: 50000
     batch_size: 100
-    split: 10
+    splits: 10
