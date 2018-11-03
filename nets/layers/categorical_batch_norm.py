@@ -5,7 +5,7 @@ import torch
 
 class CategoricalBatchNorm(torch.nn.Module):
 
-    def __init__(self, num_features, num_categories, eps=1e-5, momentum=0.1, affine=True,
+    def __init__(self, num_features, num_categories, eps=1e-5, momentum=0.1, affine=False,
                  track_running_stats=True):
         super(CategoricalBatchNorm, self).__init__()
         self.batch_norm = BatchNorm2d(num_features, eps, momentum, affine, track_running_stats)

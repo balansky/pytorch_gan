@@ -32,6 +32,7 @@ class SpectralNorm(torch.nn.Module):
         self.power_iterations=power_iterations
         self.out_features = out_features
         self.register_buffer("u", torch.randn(out_features, requires_grad=False))
+        # self.u = torch.randn(out_features, requires_grad=False)
 
     def forward(self, input):
         # _, sigma, _ = torch.svd(input)
@@ -45,11 +46,14 @@ class SpectralNorm(torch.nn.Module):
             for _ in range(self.power_iterations):
                 v = l2normalize(torch.mv(torch.t(w_mat), self.u))
 
-                self.u = l2normalize(torch.mv(w_mat, v))
+                u = l2normalize(torch.mv(w_mat, v))
 
-        sigma = self.u.dot(w_mat.mv(v))
+        sigma = u.dot(w_mat.mv(v))
 
-        w_bar = w / sigma
+        if self.training:
+            self.u = u
+
+        w_bar = w / sigma.expand_as(w.data)
 
         return w_bar, sigma
 
@@ -67,8 +71,8 @@ class Linear(torch.nn.Linear):
     def forward(self, input):
         if self.sn:
             w_bar, sigma = self.sn(self.weight)
-            # self.w_bar = w_bar
-            # self.sigma = sigma
+            # self.w_bar = w_bar.detach()
+            # self.sigma = sigma.detach()
         else:
             w_bar = self.weight
         return F.linear(input, w_bar, self.bias)

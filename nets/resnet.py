@@ -76,6 +76,7 @@ class Gblock(Block):
         x = self.conv1(x)
         x = self.bn2(x, y) if self.num_categories else self.bn2(x)
         x = self.activate(x)
+        x = self.conv2(x)
         return x
 
     def shortcut(self, input):

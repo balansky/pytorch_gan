@@ -5,6 +5,7 @@ import torch
 import copy
 from utils.sample import sample_noises
 from utils.losses import loss_hinge_dis, loss_hinge_gen
+import time
 
 
 class GanTrainer(object):
@@ -43,7 +44,6 @@ class GanTrainer(object):
         self.snapshot_dir = os.path.join(output_dir, 'snapshots')
         self.sample_dir = os.path.join(output_dir, 'samples')
         self.n_row = max(int(math.sqrt(n_gen_samples)), 1)
-        self.fixed_noise, self.fixed_y = sample_noises(n_gen_samples, self.z_dim, self.num_categories, device)
 
     def create_snapshot_dir(self):
         if not os.path.exists(self.output_dir):
@@ -53,10 +53,9 @@ class GanTrainer(object):
         if not os.path.exists(self.sample_dir):
             os.mkdir(self.sample_dir)
 
-    def gen_samples(self):
+    def gen_samples(self, gen):
         with torch.no_grad():
-            self.mirror_gen.load_state_dict(self.gen.state_dict())
-            fake = (self.mirror_gen(self.fixed_noise, self.fixed_y).detach().cpu()) * .5 + .5
+            fake = gen(self.fixed_noise, self.fixed_y).detach().cpu() * .5 + .5
         return fake
 
     def save(self, gen_path, dis_path):
@@ -101,21 +100,24 @@ class GanTrainer(object):
 
     def run(self):
         self.create_snapshot_dir()
+        st_t = time.time()
         for i in range(1, self.iteration + 1):
             disc_loss, gen_loss = self.update()
             if i % self.display_interval == 0 or i == self.iteration:
-                print('[%d]\tLoss_D: %.4f\tLoss_G: %.4f'
-                      % (i, disc_loss.item(), gen_loss.item()))
+                ed_t = time.time()
+                diff_t = self.display_interval / (ed_t - st_t)
+                print('[%d]\tLoss_D: %.4f\tLoss_G: %.4f, %.4f iters/sec'
+                      % (i, disc_loss.item(), gen_loss.item(), diff_t))
+                st_t = time.time()
             if i % self.snapshot_interval == 0 or i == self.iteration:
-
-                fake = self.gen_samples()
-                utils.save_image(fake, os.path.join(self.sample_dir, "%d_img.png" % i), nrow=self.n_row, padding=2)
                 self.save(os.path.join(self.snapshot_dir, "gen_%d.pt" % i),
                           os.path.join(self.snapshot_dir, "dis_%d.pt" % i))
             if self.evaluator and (i % self.evaluation_interval == 0 or i == self.iteration):
                 print("evaluating inception score....")
                 self.mirror_gen.load_state_dict(self.gen.state_dict())
                 score, _ = self.evaluator.eval_gen(self.mirror_gen)
+                fake = self.gen_samples(self.mirror_gen)
+                utils.save_image(fake, os.path.join(self.sample_dir, "%d_img.png" % i), nrow=self.n_row, padding=2)
                 print("[%d] evaluated inception score: %.4f" % (i, score))
         print("Training Done !")
 

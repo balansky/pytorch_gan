@@ -43,7 +43,7 @@ trainer:
     n_gen_samples: 64
     loss_type: hinge
     display_interval: 100
-    snapshot_interval: 5000
+    snapshot_interval: 10000
     evaluation_interval: 5000
 
 
@@ -51,6 +51,6 @@ evaluator:
   fn: training/evaluator.py
   name: Inception
   args:
-    n_images: 50000
+    n_images: 5000
     batch_size: 100
-    splits: 10
+    splits: 1
