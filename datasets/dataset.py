@@ -10,17 +10,15 @@ class Dataset(DataLoader):
                                       num_workers, collate_fn, pin_memory, drop_last,
                                       timeout, worker_init_fn)
         self.epochs = 1
-        self.dataloader_iter = _DataLoaderIter(self)
         self.data_iter = None
 
     def reinitialize_iter(self):
-        self.dataloader_iter = _DataLoaderIter(self)
-        self.data_iter = iter(self.dataloader_iter)
+        self.data_iter = iter(_DataLoaderIter(self))
 
     def get_next(self):
         try:
             if not self.data_iter:
-                self.data_iter = iter(self.dataloader_iter)
+                self.data_iter = iter(_DataLoaderIter(self))
             data = next(self.data_iter)
         except StopIteration:
             self.reinitialize_iter()
@@ -29,4 +27,4 @@ class Dataset(DataLoader):
         return data
 
     def __iter__(self):
-        return self.dataloader_iter
+        return iter(_DataLoaderIter(self))

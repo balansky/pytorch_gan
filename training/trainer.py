@@ -15,8 +15,8 @@ class GanTrainer(object):
                  display_interval=100, snapshot_interval=1000, evaluation_interval=1000, device=torch.device('cpu')):
         self.gen = genenerator.to(device)
         self.dis = discriminator.to(device)
-        self.mirror_gen = copy.deepcopy(genenerator).to(device)
-        self.mirror_gen.eval()
+        # self.mirror_gen = copy.deepcopy(genenerator).to(device)
+        # self.mirror_gen.eval()
         self.gen_optimizer = gen_optimizer
         self.dis_optimizer = dis_optimizer
         self.scheduler_g = scheduler_g
@@ -68,29 +68,30 @@ class GanTrainer(object):
 
     def update(self):
 
+        self.gen_optimizer.zero_grad()
+
+        noise, y_fake = sample_noises(self.batch_size, self.z_dim, self.num_categories, self.device)
+
+        x_fake = self.gen(noise, y_fake)
+        dis_fake = self.dis(x_fake, y_fake)
+        gen_loss = loss_hinge_gen(dis_fake)
+        gen_loss.backward()
+
+        self.gen_optimizer.step()
+
         for _ in range(self.n_dis):
             x_real, y_real = self.dataset.get_next()
             x_real = x_real.to(self.device)
             y_real = y_real.to(self.device)
             noise, y_fake = sample_noises(self.batch_size, self.z_dim, self.num_categories, self.device)
             self.dis_optimizer.zero_grad()
-            self.gen_optimizer.zero_grad()
             dis_real = self.dis(x_real, y_real)
             dis_fake = self.dis(self.gen(noise, y_fake).detach(), y_fake)
             disc_loss = self.loss_dis(dis_fake, dis_real)
             disc_loss.backward()
             self.dis_optimizer.step()
 
-        self.dis_optimizer.zero_grad()
-        self.gen_optimizer.zero_grad()
 
-        noise, y_fake = sample_noises(self.batch_size, self.z_dim, self.num_categories, self.device)
-
-        x_fake = self.gen(noise, y_fake)
-        gen_loss = -self.dis(x_fake, y_fake).mean()
-        gen_loss.backward()
-
-        self.gen_optimizer.step()
 
         if self.scheduler_d and self.scheduler_g:
             self.scheduler_g.step()
@@ -101,24 +102,32 @@ class GanTrainer(object):
     def run(self):
         self.create_snapshot_dir()
         st_t = time.time()
+        dis_losses = []
+        gen_losses = []
         for i in range(1, self.iteration + 1):
             disc_loss, gen_loss = self.update()
+            dis_losses.append(disc_loss.item())
+            gen_losses.append(gen_loss.item())
             if i % self.display_interval == 0 or i == self.iteration:
                 ed_t = time.time()
                 diff_t = self.display_interval / (ed_t - st_t)
                 print('[%d]\tLoss_D: %.4f\tLoss_G: %.4f, %.4f iters/sec'
-                      % (i, disc_loss.item(), gen_loss.item(), diff_t))
+                      % (i, sum(dis_losses)/float(self.display_interval), sum(gen_losses)/float(self.display_interval), diff_t))
+                dis_losses = []
+                gen_losses = []
                 st_t = time.time()
             if i % self.snapshot_interval == 0 or i == self.iteration:
                 self.save(os.path.join(self.snapshot_dir, "gen_%d.pt" % i),
                           os.path.join(self.snapshot_dir, "dis_%d.pt" % i))
             if self.evaluator and (i % self.evaluation_interval == 0 or i == self.iteration):
                 print("evaluating inception score....")
-                self.mirror_gen.load_state_dict(self.gen.state_dict())
-                score, _ = self.evaluator.eval_gen(self.mirror_gen)
-                fake = self.gen_samples(self.mirror_gen)
+                self.gen.eval()
+                # self.mirror_gen.load_state_dict(self.gen.state_dict())
+                score, _ = self.evaluator.eval_gen(self.gen)
+                fake = self.gen_samples(self.gen)
                 utils.save_image(fake, os.path.join(self.sample_dir, "%d_img.png" % i), nrow=self.n_row, padding=2)
                 print("[%d] evaluated inception score: %.4f" % (i, score))
+                self.gen.train()
         print("Training Done !")
 
 

@@ -25,7 +25,8 @@ class Inception(object):
         with torch.no_grad():
             if batch_images.shape[-1] != 299 or batch_images.shape[-2] != 299:
                 batch_images = torch.nn.functional.interpolate(batch_images, size=(299, 299), mode='bilinear',
-                                                               align_corner=True)
+                                                               align_corners=True)
+
             y = self.inception_model(batch_images)
             y = torch.nn.functional.softmax(y, dim=1)
         return y

@@ -24,53 +24,82 @@ def l2normalize(v, eps=1e-12):
 #
 #     return w_bar, u, sigma
 
+#
+# class SpectralNorm(torch.nn.Module):
+#
+#     def __init__(self, out_features, power_iterations=1):
+#         super(SpectralNorm, self).__init__()
+#         self.power_iterations = power_iterations
+#         self.out_features = out_features
+#         # self.register_buffer("u", torch.randn(out_features, requires_grad=False))
+#
+#         self.register_buffer("u", torch.randn((1, out_features), requires_grad=False))
+#
+#     def forward(self, w):
+#         w_mat = w.view(w.data.shape[0], -1)
+#
+#         # with torch.no_grad():
+#         #     _, sigma, _ = torch.svd(w_mat)
+#         #     sigma = sigma[0]
+#
+#         #
+#         u = self.u
+#         with torch.no_grad():
+#             for _ in range(self.power_iterations):
+#                 v = l2normalize(torch.mm(u, w_mat.data))
+#
+#                 u = l2normalize(torch.mm(v, torch.t(w_mat.data)))
+#
+#                 # v = l2normalize(torch.mv(torch.t(w_mat), self.u))
+#
+#                 # u = l2normalize(torch.mv(w_mat, v))
+#
+#         # sigma = u.dot(w_mat.mv(v))
+#         sigma = torch.sum(torch.mm(u, w_mat) * v)
+#
+#         if self.training:
+#             self.u = u
+#         w_bar = torch.div(w, sigma)
+#         # w_bar = w / sigma.expand_as(w.data)
+#
+#         return w_bar, sigma
 
-class SpectralNorm(torch.nn.Module):
 
-    def __init__(self, out_features, power_iterations=1):
-        super(SpectralNorm, self).__init__()
-        self.power_iterations=power_iterations
-        self.out_features = out_features
-        self.register_buffer("u", torch.randn(out_features, requires_grad=False))
-        # self.u = torch.randn(out_features, requires_grad=False)
+def max_singular_value(w_mat, u, power_iterations):
 
-    def forward(self, input):
-        # _, sigma, _ = torch.svd(input)
-        # sigma = sigma[0]
+    for _ in range(power_iterations):
+        v = l2normalize(torch.mm(u, w_mat.data))
 
-        w = input
+        u = l2normalize(torch.mm(v, torch.t(w_mat.data)))
 
-        w_mat = w.view(w.data.shape[0], -1)
+    sigma = torch.sum(torch.mm(u, w_mat) * v)
 
-        with torch.no_grad():
-            for _ in range(self.power_iterations):
-                v = l2normalize(torch.mv(torch.t(w_mat), self.u))
+    return u, sigma, v
 
-                u = l2normalize(torch.mv(w_mat, v))
-
-        sigma = u.dot(w_mat.mv(v))
-
-        if self.training:
-            self.u = u
-
-        w_bar = w / sigma.expand_as(w.data)
-
-        return w_bar, sigma
 
 
 class Linear(torch.nn.Linear):
 
     def __init__(self, *args, spectral_norm_pi=1, **kwargs):
         super(Linear, self).__init__(*args, **kwargs)
+        self.spectral_norm_pi = spectral_norm_pi
         if spectral_norm_pi > 0:
-            self.add_module("sn", SpectralNorm(self.weight.shape[0], spectral_norm_pi))
+            self.register_buffer("u", torch.randn((1, self.out_features), requires_grad=False))
         else:
-            self.add_module("sn", None)
+            self.register_buffer("u", None)
+        if self.bias is not None:
+            torch.nn.init.constant_(self.bias.data, 0)
 
 
     def forward(self, input):
-        if self.sn:
-            w_bar, sigma = self.sn(self.weight)
+        if self.spectral_norm_pi > 0:
+            w_mat = self.weight.view(self.out_features, -1)
+            u, sigma, _ = max_singular_value(w_mat, self.u, self.spectral_norm_pi)
+
+            # w_bar = torch.div(w_mat, sigma)
+            w_bar = torch.div(self.weight, sigma)
+            if self.training:
+                self.u = u
             # self.w_bar = w_bar.detach()
             # self.sigma = sigma.detach()
         else:
@@ -82,16 +111,24 @@ class Conv2d(torch.nn.Conv2d):
 
     def __init__(self, *args, spectral_norm_pi=1, **kwargs):
         super(Conv2d, self).__init__(*args, **kwargs)
+        self.spectral_norm_pi = spectral_norm_pi
         if spectral_norm_pi > 0:
-            self.add_module("sn", SpectralNorm(self.weight.shape[0], spectral_norm_pi))
+            self.register_buffer("u", torch.randn((1, self.out_channels), requires_grad=False))
         else:
-            self.add_module("sn", None)
+            self.register_buffer("u", None)
+        if self.bias is not None:
+            torch.nn.init.constant_(self.bias.data, 0)
 
     def forward(self, input):
-        if self.sn:
-            w_bar, sigma = self.sn(self.weight)
+        if self.spectral_norm_pi > 0:
+            w_mat = self.weight.view(self.out_channels, -1)
+            u, sigma, _ = max_singular_value(w_mat, self.u, self.spectral_norm_pi)
+            w_bar = torch.div(self.weight, sigma)
+            if self.training:
+                self.u = u
         else:
             w_bar = self.weight
+
         return F.conv2d(input, w_bar, self.bias, self.stride,
                         self.padding, self.dilation, self.groups)
 
@@ -100,16 +137,22 @@ class Embedding(torch.nn.Embedding):
 
     def __init__(self, *args, spectral_norm_pi=1, **kwargs):
         super(Embedding, self).__init__(*args, **kwargs)
+        self.spectral_norm_pi = spectral_norm_pi
         if spectral_norm_pi > 0:
-            self.add_module("sn", SpectralNorm(self.weight.shape[0], spectral_norm_pi))
+            self.register_buffer("u", torch.randn((1, self.num_embeddings), requires_grad=False))
         else:
-            self.add_module("sn", None)
+            self.register_buffer("u", None)
 
     def forward(self, input):
-        if self.sn:
-            w_bar, sigma = self.sn(self.weight)
+        if self.spectral_norm_pi > 0:
+            w_mat = self.weight.view(self.num_embeddings, -1)
+            u, sigma, _ = max_singular_value(w_mat, self.u, self.spectral_norm_pi)
+            w_bar = torch.div(self.weight, sigma)
+            if self.training:
+                self.u = u
         else:
             w_bar = self.weight
+
         return F.embedding(
             input, w_bar, self.padding_idx, self.max_norm,
             self.norm_type, self.scale_grad_by_freq, self.sparse)

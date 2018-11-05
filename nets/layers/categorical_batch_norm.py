@@ -11,6 +11,7 @@ class CategoricalBatchNorm(torch.nn.Module):
         self.batch_norm = BatchNorm2d(num_features, eps, momentum, affine, track_running_stats)
         self.gamma_c = torch.nn.Embedding(num_categories, num_features)
         self.beta_c = torch.nn.Embedding(num_categories, num_features)
+        torch.nn.init.constant_(self.batch_norm.running_var.data, 0)
         torch.nn.init.constant_(self.gamma_c.weight.data, 1)
         torch.nn.init.constant_(self.beta_c.weight.data, 0)
 

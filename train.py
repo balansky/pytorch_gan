@@ -4,13 +4,16 @@ from utils import yaml_utils
 from utils.load import *
 from training.trainer import GanTrainer
 
+torch.manual_seed(0)
+torch.cuda.manual_seed_all(0)
+
 
 def main(args):
     device = torch.device("cuda:0")
     config = yaml_utils.Config(yaml.load(open(args.config_path)))
     gen, dis = load_gan_model(config)
     gen_optimizer = load_optimizer(config, gen.parameters())
-    dis_optimizer = load_optimizer(config, filter(lambda p: p.requires_grad, dis.parameters()))
+    dis_optimizer = load_optimizer(config, dis.parameters())
 
     scheduler_g = load_scheduler(config, gen_optimizer)
     scheduler_d = load_scheduler(config, dis_optimizer)
