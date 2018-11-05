@@ -62,8 +62,8 @@ class Gblock(Block):
         self.bn1 = self.batch_norm(self.in_channels)
         self.bn2 = self.batch_norm(self.hidden_channels)
         if upsample:
-            self.up = torch.nn.ConvTranspose2d(in_channels, in_channels, 2, stride=2)
-            # self.up = lambda a: torch.nn.functional.interpolate(a, scale_factor=2, mode='bilinear')
+            # self.up = torch.nn.ConvTranspose2d(in_channels, in_channels, 2, stride=2)
+            self.up = lambda a: torch.nn.functional.interpolate(a, scale_factor=2)
         else:
             self.up = lambda a: None
 
@@ -76,11 +76,11 @@ class Gblock(Block):
         x = self.bn1(x, y) if self.num_categories else self.bn1(x)
         x = self.activate(x)
         if self.upsample:
-            # x = self.up(x)
-            output_size = list(input.size())
-            output_size[-1] = output_size[-1] * 2
-            output_size[-2] = output_size[-2] * 2
-            x = self.up(x, output_size=output_size)
+            x = self.up(x)
+            # output_size = list(input.size())
+            # output_size[-1] = output_size[-1] * 2
+            # output_size[-2] = output_size[-2] * 2
+            # x = self.up(x, output_size=output_size)
         x = self.conv1(x)
         x = self.bn2(x, y) if self.num_categories else self.bn2(x)
         x = self.activate(x)
