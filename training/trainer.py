@@ -72,7 +72,7 @@ class GanTrainer(object):
 
         noise, y_fake = sample_noises(self.batch_size, self.z_dim, self.num_categories, self.device)
         # noise, y_fake = sample_noises(self.batch_size*(1 + self.n_dis), self.z_dim, self.num_categories, self.device)
-        x_fake = self.gen(noise[:self.batch_size], y_fake)
+        x_fake = self.gen(noise, y_fake)
         dis_fake = self.dis(x_fake, y_fake)
         gen_loss = loss_hinge_gen(dis_fake)
         gen_loss.backward()

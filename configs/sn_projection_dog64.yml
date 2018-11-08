@@ -24,7 +24,7 @@ dataset:
   fn: datasets/imagenet_dog.py
   name: ImageNetDogDataset
   args:
-    size: 128
+    size: 64
     augmentation: True
     shuffle: True
     pin_memory: True
@@ -48,7 +48,7 @@ trainer:
   name: GanTrainer
   args:
     n_dis: 5
-    n_gen_samples: 32
+    n_gen_samples: 64
     loss_type: hinge
     display_interval: 100
     snapshot_interval: 1000
