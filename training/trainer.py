@@ -91,8 +91,6 @@ class GanTrainer(object):
             disc_loss.backward()
             self.dis_optimizer.step()
 
-
-
         if self.scheduler_d and self.scheduler_g:
             self.scheduler_g.step()
             self.scheduler_d.step()
