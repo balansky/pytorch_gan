@@ -66,7 +66,7 @@ class GanTrainer(object):
         self.gen.load_state_dict(torch.load(gen_path))
         self.dis.load_state_dict(torch.load(dis_path))
 
-    def update(self):
+    def update(self, x_, y_):
 
         self.gen_optimizer.zero_grad()
 
@@ -80,9 +80,8 @@ class GanTrainer(object):
         self.gen_optimizer.step()
 
         for i in range(self.n_dis):
-            x_real, y_real = self.dataset.get_next()
-            x_real = x_real.to(self.device)
-            y_real = y_real.to(self.device)
+            x_real = x_[self.batch_size*i: self.batch_size*i + self.batch_size]
+            y_real = y_[self.batch_size*i: self.batch_size*i + self.batch_size]
             noise, y_fake = sample_noises(self.batch_size, self.z_dim, self.num_categories, self.device)
             self.dis_optimizer.zero_grad()
             dis_real = self.dis(x_real, y_real)
@@ -105,7 +104,17 @@ class GanTrainer(object):
         gen_losses = []
         for i in range(1, self.iteration + 1):
             st_t = time.time()
-            disc_loss, gen_loss = self.update()
+            x = []
+            y = []
+            for _ in range(self.n_dis):
+                x_, y_ = self.dataset.get_next()
+                x_ = x_.to(self.device)
+                y_ = y_.to(self.device)
+                x.append(x_)
+                y.append(y_)
+            x = torch.cat(x, 0)
+            y = torch.cat(y, 0)
+            disc_loss, gen_loss = self.update(x, y)
             update_t += (time.time() - st_t)
             dis_losses.append(disc_loss.item())
             gen_losses.append(gen_loss.item())
