@@ -40,8 +40,8 @@ scheduler:
   fn: training/scheduler.py
   name: LinearDecayLR
   args:
-    decay_start: 250000
-    max_iterations: 200000
+    decay_start: 200000
+    max_iterations: 250000
 
 trainer:
   fn: training/trainer.py
