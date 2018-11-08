@@ -12,12 +12,15 @@ class Inception(object):
         self.n_batches = int(math.ceil(float(n_images)/float(batch_size)))
         self.device = device
         self.inception_model = inception_v3(pretrained=True, transform_input=False)
+        # self.mean = torch.tensor([0.485, 0.456, 0.406]).unsqueeze(1).unsqueeze(2).to(self.device)
+        # self.std = torch.tensor([0.229, 0.224, 0.225]).unsqueeze(1).unsqueeze(2).to(self.device)
         self.inception_model.eval().to(device)
 
     def generate_images(self, gen):
         with torch.no_grad():
             batch_noise, batch_y = sample_noises(self.batch_size, gen.z_dim, gen.n_categories, self.device)
             # batch_images = (gen(batch_noise, batch_y).detach() * .5 + .5)
+            # batch_images = (batch_images - self.mean) / self.std
             batch_images = gen(batch_noise, batch_y).detach()
         return batch_images
 
@@ -25,7 +28,7 @@ class Inception(object):
         with torch.no_grad():
             if batch_images.shape[-1] != 299 or batch_images.shape[-2] != 299:
                 batch_images = torch.nn.functional.interpolate(batch_images, size=(299, 299), mode='bilinear',
-                                                               align_corners=True)
+                                                               align_corners=False)
 
             y = self.inception_model(batch_images)
             y = torch.nn.functional.softmax(y, dim=1)

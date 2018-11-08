@@ -71,15 +71,15 @@ class GanTrainer(object):
         self.gen_optimizer.zero_grad()
 
         noise, y_fake = sample_noises(self.batch_size, self.z_dim, self.num_categories, self.device)
-
-        x_fake = self.gen(noise, y_fake)
+        # noise, y_fake = sample_noises(self.batch_size*(1 + self.n_dis), self.z_dim, self.num_categories, self.device)
+        x_fake = self.gen(noise[:self.batch_size], y_fake)
         dis_fake = self.dis(x_fake, y_fake)
         gen_loss = loss_hinge_gen(dis_fake)
         gen_loss.backward()
 
         self.gen_optimizer.step()
 
-        for _ in range(self.n_dis):
+        for i in range(self.n_dis):
             x_real, y_real = self.dataset.get_next()
             x_real = x_real.to(self.device)
             y_real = y_real.to(self.device)
@@ -87,6 +87,7 @@ class GanTrainer(object):
             self.dis_optimizer.zero_grad()
             dis_real = self.dis(x_real, y_real)
             dis_fake = self.dis(self.gen(noise, y_fake).detach(), y_fake)
+
             disc_loss = self.loss_dis(dis_fake, dis_real)
             disc_loss.backward()
             self.dis_optimizer.step()
@@ -99,21 +100,25 @@ class GanTrainer(object):
 
     def run(self):
         self.create_snapshot_dir()
-        st_t = time.time()
+        update_t = 0
         dis_losses = []
         gen_losses = []
         for i in range(1, self.iteration + 1):
+            st_t = time.time()
             disc_loss, gen_loss = self.update()
+            update_t += (time.time() - st_t)
             dis_losses.append(disc_loss.item())
             gen_losses.append(gen_loss.item())
             if i % self.display_interval == 0 or i == self.iteration:
-                ed_t = time.time()
-                diff_t = self.display_interval / (ed_t - st_t)
+                interval = self.display_interval if i != self.iteration else self.iteration % self.display_interval
+                if interval == 0:
+                    interval = self.display_interval
+                diff_t = interval / update_t
                 print('[%d]\tLoss_D: %.4f\tLoss_G: %.4f, %.4f iters/sec'
-                      % (i, sum(dis_losses)/float(self.display_interval), sum(gen_losses)/float(self.display_interval), diff_t))
+                      % (i, sum(dis_losses)/float(interval), sum(gen_losses)/float(interval), diff_t))
                 dis_losses = []
                 gen_losses = []
-                st_t = time.time()
+                update_t = 0
             if i % self.snapshot_interval == 0 or i == self.iteration:
                 self.save(os.path.join(self.snapshot_dir, "gen_%d.pt" % i),
                           os.path.join(self.snapshot_dir, "dis_%d.pt" % i))
